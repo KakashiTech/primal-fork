@@ -2225,6 +2225,7 @@ export const initAccountStore: AccountStore = {
     const nostr = win.nostr;
 
     if (!nostr && extensionAttempt < 4) {
+      loginGuest();
       setTimeout(() => {
         findActiveLogin(extensionAttempt + 1);
       }, 500);
