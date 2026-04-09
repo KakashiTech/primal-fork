@@ -372,6 +372,7 @@ const ArticleCompactPreview: Component<{
         ref={articlePreview}
         class={styles.articleCompact}
         href={articleUrl()}
+        onClick={e => e.stopPropagation()}
       >
         {children}
       </A>

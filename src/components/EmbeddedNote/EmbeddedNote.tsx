@@ -132,7 +132,10 @@ const EmbeddedNote: Component<EmbeddedNoteProps> = (props) => {
       <a
         href={`/e/${noteId()}`}
         class={klass()}
-        onClick={() => navToThread()}
+        onClick={(e) => {
+          e.stopPropagation()
+          navToThread();
+        }}
         data-event={props.note?.post.id}
         data-event-bech32={noteId()}
       >
