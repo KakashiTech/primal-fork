@@ -131,7 +131,12 @@ export const decodeNWCUri = (uri: string) => {
   // Uri format:
   // nostr+walletconnect://[pubkey]?relay=[relay]&secret=[secret]&lud16=[lud16]
 
-  const url = decodeURIComponent(uri);
+  let url = decodeURIComponent(uri);
+
+  if (url.includes('%3A%2F%2F')) {
+    url = decodeURIComponent(url)
+  }
+
   const pIndex = url.indexOf('://');
 
   const protocol = url.slice(0, pIndex);
