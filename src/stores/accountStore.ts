@@ -515,10 +515,13 @@ export const initAccountStore: AccountStore = {
   }
 
   export const suspendRelays = () => {
-    relayWorker.onmessage = (e: MessageEvent) => {
+    const handleClosed = (e: MessageEvent) => {
       if (e.data !== 'RELAYS_CLOSED') return;
+      relayWorker.removeEventListener('message', handleClosed);
       updateAccountStore('activeRelays', () => []);
     };
+
+    relayWorker.addEventListener('message', handleClosed);
 
     relayWorker.postMessage({ type: 'CLOSE_RELAYS', relays: [...accountStore.activeRelays] });
   }
@@ -735,8 +738,9 @@ export const initAccountStore: AccountStore = {
         relaysToClose.add(url);
       }
 
-      relayWorker.onmessage = (e: MessageEvent) => {
+      const handleClosed = (e: MessageEvent) => {
         if (e.data !== 'RELAYS_CLOSED') return;
+        relayWorker.removeEventListener('message', handleClosed);
 
         const filtered = accountStore.activeRelays.filter(r => !relaysToClose.has(r));
         updateAccountStore('activeRelays', () => filtered);
@@ -746,6 +750,8 @@ export const initAccountStore: AccountStore = {
         connectToRelays(settings)
         saveRelaySettings(accountStore.publicKey, settings);
       };
+
+      relayWorker.addEventListener('message', handleClosed);
 
       relayWorker.postMessage({ type: 'CLOSE_RELAYS', relays: Array.from(relaysToClose)});
     }
@@ -807,6 +813,8 @@ export const initAccountStore: AccountStore = {
     return relaySettings;
   }
 
+  let currentRelayOpenedHandler: ((e: MessageEvent) => void) | undefined;
+
   export const connectToRelays = async (relaySettings: NostrRelays, sendRelayList?: boolean) => {
     if (accountStore.proxyThroughPrimal) return;
 
@@ -822,7 +830,11 @@ export const initAccountStore: AccountStore = {
       return;
     }
 
-    relayWorker.onmessage = (e: MessageEvent<{ type: string, relay: Relay }>) => {
+    if (currentRelayOpenedHandler) {
+      relayWorker.removeEventListener('message', currentRelayOpenedHandler);
+    }
+
+    const handleOpened = (e: MessageEvent<{ type: string, relay: Relay }>) => {
       const { type, relay } = e.data;
 
       if (type !== 'RELAY_OPENED' || ! relay) return;
@@ -830,6 +842,9 @@ export const initAccountStore: AccountStore = {
 
       updateAccountStore('activeRelays', accountStore.activeRelays.length, () => relay);
     };
+
+    currentRelayOpenedHandler = handleOpened;
+    relayWorker.addEventListener('message', handleOpened);
 
     relayWorker.postMessage({ type: 'OPEN_RELAYS', relays: [...relays]});
   };
@@ -900,8 +915,9 @@ export const initAccountStore: AccountStore = {
   export const removeRelay = (url: string) => {
     const normalUrl = utils.normalizeURL(url);
 
-    relayWorker.onmessage = (e) => {
+    const handleClosed = (e: MessageEvent) => {
       if (e.data !== 'RELAYS_CLOSED') return;
+      relayWorker.removeEventListener('message', handleClosed);
 
       const filtered = accountStore.activeRelays.filter(r => r !== normalUrl);
       updateAccountStore('activeRelays', () => filtered);
@@ -935,6 +951,8 @@ export const initAccountStore: AccountStore = {
 
       getRelays(accountStore.publicKey, `before_remove_relay_${APP_ID}`);
     }
+
+    relayWorker.addEventListener('message', handleClosed);
 
     relayWorker.postMessage({ type: 'CLOSE_RELAYS', relays: [normalUrl]});
   };

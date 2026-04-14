@@ -25,7 +25,11 @@ export const zapOverNWC = async (pubkey: string, nwcEnc: string, invoice: string
 
     if (nwcConfig.relays.length === 0) return false;
 
-    relayWorker.onmessage = (e: MessageEvent<{ event: NostrEvent, secret: string, pubkey: string}>) => {
+    const handleNWCResponse = (e: MessageEvent<{ type: string, event: NostrEvent, secret: string, pubkey: string}>) => {
+      if (e.data.type !== 'NWC_RESPONSE') return;
+
+      relayWorker.removeEventListener('message', handleNWCResponse);
+
       const {event, secret, pubkey } = e.data;
 
       if (!secret) {
@@ -39,6 +43,8 @@ export const zapOverNWC = async (pubkey: string, nwcEnc: string, invoice: string
         console.error('Failed NWC payment: ', content.error);
       }
     }
+
+    relayWorker.addEventListener('message', handleNWCResponse);
 
     relayWorker.postMessage({ type: 'SEND_NWC', nwcData: {
       event: request,
