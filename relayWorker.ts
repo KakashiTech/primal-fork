@@ -64,6 +64,7 @@ self.addEventListener('message', (e: MessageEvent<WorkerMessageType>) => {
 
             subInfo.close();
             self.postMessage({
+              type: 'NWC_RESPONSE',
               secret,
               pubkey,
               event: eInfo,
@@ -86,7 +87,7 @@ self.addEventListener('message', (e: MessageEvent<WorkerMessageType>) => {
       },
       {
         onevent: (e) => {
-          self.postMessage({ event: e });
+          self.postMessage({ type: 'NWC_INFO_RESPONSE', event: e });
         },
         oneose: () => {
           sub.close();
