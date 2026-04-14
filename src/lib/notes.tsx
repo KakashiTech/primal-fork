@@ -481,7 +481,7 @@ export const proxyEvent = async (event: NostrRelaySignedEvent, relays: Relay[], 
   }
 }
 
-export const sendNote = (text: string, tags: string[][]) => {
+export const sendNote = (text: string, tags: string[][], waitForImport?: boolean) => {
   const event = {
     content: text,
     kind: Kind.Text,
@@ -493,8 +493,9 @@ export const sendNote = (text: string, tags: string[][]) => {
     sendEvent(event, {
       success: (noteEvent) => {
         if (noteEvent) {
-          triggerImportEvents([noteEvent], `import_${APP_ID}`)
-          resolve({ success: true, note: noteEvent });
+          const then = waitForImport ? () => { resolve({ success: true, note: noteEvent })} : () => {};
+          triggerImportEvents([noteEvent], `import_${APP_ID}`, then)
+          !waitForImport && resolve({ success: true, note: noteEvent });
           return;
         }
 
@@ -558,22 +559,16 @@ export const sendPoll = (
     sendEvent(event, {
       success: (pollEvent) => {
         if (pollEvent) {
-          triggerImportEvents([pollEvent], `import_${APP_ID}`, () => {
-            if (waitForImport) {
-              resolve({ success: true, note: pollEvent });
-            }
-          })
-
-          if (!waitForImport) {
-            resolve({ success: true, note: pollEvent });
-          }
+          const then = waitForImport ? () => { resolve({ success: true, note: pollEvent })} : () => {};
+          triggerImportEvents([pollEvent], `import_${APP_ID}`, then)
+          !waitForImport && resolve({ success: true, note: pollEvent });
           return;
         }
 
         resolve({ success: false, reasons: ['failed-to-publish']});
       },
-      fail: (noteEvent) => {
-        resolve({ success: false, note: noteEvent });
+      fail: (pollEvent) => {
+        resolve({ success: false, note: pollEvent });
       }
     });
   })
