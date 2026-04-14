@@ -172,14 +172,9 @@ export const decodeNWCUri = (uri: string) => {
 };
 
 export const sendNWCInfoEvent = async (nwcConfig: NWCConfig) => {
-  const handleNWCInfo = (e: MessageEvent<{ type: string, event: Event }>) => {
-    if (e.data.type !== 'NWC_INFO_RESPONSE') return;
-
-    relayWorker.removeEventListener('message', handleNWCInfo);
+  relayWorker.onmessage = (e: MessageEvent<{ event: Event }>) => {
     logInfo('GOT EVENT: ', e);
   };
-
-  relayWorker.addEventListener('message', handleNWCInfo);
 
   relayWorker.postMessage({ type: 'NWC_INFO', nwcData: { nwcConfig }})
 };
