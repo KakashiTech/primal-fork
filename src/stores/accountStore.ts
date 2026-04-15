@@ -2206,6 +2206,7 @@ export const initAccountStore: AccountStore = {
     // }
     // updateAccountStore('isKeyLookupDone', () => isStored);
 
+
     switch (type) {
       case 'npub':
         loginUsingNpub();
@@ -2284,33 +2285,30 @@ export const initAccountStore: AccountStore = {
 
     try {
       setLoginType('extension');
-      let key = pk;
-
-      if (key === undefined) {
-        key = await Promise.race([
-          getPublicKey(),
-          timeoutPromiseResolve(3_000)
-        ]);
-      }
+      let key = await Promise.race([
+        getPublicKey(),
+        timeoutPromiseResolve(3_000)
+      ]);
 
       if (key === undefined) {
         setTimeout(() => {
           loginUsingExtension(extensionAttempt + 1);
         }, 250);
+        return;
       }
-      else {
-        setPublicKey(key);
 
-        // Read profile from storage
-        const storedUser = getStoredProfile(key);
+      setPublicKey(key);
 
-        if (storedUser) {
-          // If it exists, set it as active user
-          updateAccountStore('activeUser', () => ({...storedUser}));
-        }
+      // Read profile from storage
+      const storedUser = getStoredProfile(key);
 
-        doAfterLogin(key);
+      if (storedUser) {
+        // If it exists, set it as active user
+        updateAccountStore('activeUser', () => ({...storedUser}));
       }
+
+      doAfterLogin(key);
+
     } catch (e: any) {
       setLoginType('guest');
       setPublicKey(undefined);
