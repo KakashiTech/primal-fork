@@ -501,11 +501,10 @@ const PrimalMarkdown: Component<{
       let alt = '';
 
       if (token.value.startsWith('![')) {
-        let urlMatches = token.value.match(/\((.*?)\)/);
-        let altMatches = token.value.match(/\[(.*?)\]/);
+        const imageMatch = token.value.match(/^!\[([^\]]*)\]\((\S+?)(?:\s+"[^"]*")?\)/);
 
-        src = urlMatches ? urlMatches[1] : '';
-        alt = altMatches ? altMatches[1] : '';
+        alt = imageMatch ? imageMatch[1] : '';
+        src = imageMatch ? imageMatch[2] : '';
       }
 
       if (token.value.startsWith('http')) {
