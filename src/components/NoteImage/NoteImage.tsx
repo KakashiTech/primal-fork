@@ -33,18 +33,35 @@ const NoteImage: Component<{
   let imgActual: HTMLImageElement | undefined;
 
   const [isImageLoaded, setIsImageLoaded] = createSignal(false);
+  const [hasFailed, setHasFailed] = createSignal(false);
 
   const [src, setSrc] = createSignal<string | undefined>();
 
   const isCached = () => !props.isDev || props.media;
 
+  const MAX_RETRIES = 3;
+  let retryCount = 0;
+
+  const giveUp = (event: any) => {
+    const image = event.target;
+    if (image) image.onerror = "";
+    setHasFailed(true);
+    setIsImageLoaded(false);
+    // @ts-ignore
+    props.onError && props.onError(event);
+    return true;
+  };
+
   const onError = async (event: any) => {
     const image = event.target;
 
-    if (image.src === props.altSrc || image.src.endsWith(props.altSrc)) {
-      // @ts-ignore
-      props.onError && props.onError(event);
-      return true;
+    retryCount++;
+    if (retryCount > MAX_RETRIES) {
+      return giveUp(event);
+    }
+
+    if (props.altSrc && (image.src === props.altSrc || image.src.endsWith(props.altSrc))) {
+      return giveUp(event);
     }
 
     // list of user's blossom servers from kind 10_063
@@ -90,6 +107,9 @@ const NoteImage: Component<{
         return true;
       }
     } catch {
+      if (!props.altSrc) {
+        return giveUp(event);
+      }
       image.onerror = "";
       image.src = props.altSrc;
       setSrc(() => props.altSrc || '');
@@ -199,7 +219,7 @@ const NoteImage: Component<{
 
   return (
     <Show
-      when={props.noPlaceholders || isImageLoaded()}
+      when={!hasFailed() && (props.noPlaceholders || isImageLoaded())}
       fallback={<div class={styles.placeholderImage}></div>}
     >
       <a
