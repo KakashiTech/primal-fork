@@ -174,6 +174,8 @@ const NoteVideo: Component<{
     if (props.height) {
       s += `height: ${props.height}px;`;
     }
+
+    s += ` max-width: 100%;`;
     return s;
   }
 

@@ -67,7 +67,6 @@ import {
   noteRegex,
   profileRegex,
   shortMentionInWords,
-  shortNoteChars,
   shortNoteWords,
   specialCharsRegex,
   urlExtractRegex,
@@ -235,23 +234,16 @@ const ParsedNote: Component<{
 
   const [wordsDisplayed, setWordsDisplayed] = createSignal(0);
 
-  const isNoteTooLong = () => {
-    return props.shorten && wordsDisplayed() > shortNoteWords;
-  };
+  // Truncation is now decided deterministically in `generateContent`, which builds
+  // `content` to hold exactly what should be shown. The renderers therefore must
+  // never bail on their own, so this stays false; `isTooLong` drives the "see more".
+  const isNoteTooLong = () => false;
+
+  const [isTooLong, setIsTooLong] = createSignal(false);
 
   const rootNote = () => props.rootNote || props.note;
 
-  const noteContent = () => {
-    const content = props.note.content || '';
-    const charLimit = 7 * shortNoteChars;
-
-    if (!props.shorten || content.length < charLimit) return content;
-
-    // Find the first word break after the char limit so we don't do a word cut-off
-    const nextWordBreak = content.slice(charLimit).search(/\s|\n|\r/);
-
-    return content.slice(0, charLimit + nextWordBreak);
-  };
+  const noteContent = () => props.note.content || '';
 
   const parseContent = () => {
     const content = props.ignoreLinebreaks ?
@@ -598,16 +590,33 @@ const ParsedNote: Component<{
     return;
   };
 
-  const generateContent = () => {
+  // A token is an "embed" (image, video, mention, rich media, link preview) if it
+  // does not count towards the word limit and is eligible to be the teaser shown
+  // after the cut-off text of a shortened note.
+  const isEmbedToken = (token: string): boolean => {
+    if (token === '__LB__' || token === '__SP__' || token.trim().length === 0) return false;
 
-    parseContent();
+    if (isUrl(token)) {
+      if (!props.ignoreMedia && (
+        isImage(token) || isMp4Video(token) || isOggVideo(token) || isWebmVideo(token) ||
+        is3gppVideo(token) || isAudio(token) || isYouTube(token) || isSpotify(token) ||
+        isTwitchPlayer(token) || isTwitch(token) || isMixCloud(token) || isSoundCloud(token) ||
+        isAppleMusic(token) || isWavelake(token) || isRumble(token) || isZapStream(token)
+      )) return true;
 
-    for (let i=0; i<tokens.length; i++) {
-      const token = tokens[i];
-
-      parseToken(token);
+      // A link with a usable preview is an embed; a bare link counts as a word.
+      const preview = getLinkPreview(token);
+      return !props.noPreviews && !!preview && !!preview.url && (
+        (!!preview.description && preview.description.length > 0) ||
+        !preview.images?.some((x: any) => x === '') || !!preview.title
+      );
     }
 
+    return isNoteMention(token) || isAddrMention(token) ||
+      isUnitifedLnAddress(token) || isLnbc(token);
+  };
+
+  const finalizeContent = () => {
     // Check if the last media is the last meaningfull content in the note
     // And if so, make it the actual last content
     // @ts-ignore
@@ -618,6 +627,71 @@ const ParsedNote: Component<{
     if (lastMediaIndex === content.length - 2 && lastContent.type === 'text' && lastContent.tokens.every(t => [' ', ''].includes(t))) {
       setContent((cont) => cont.slice(0, cont.length - 1));
     }
+  };
+
+  const generateContent = () => {
+
+    parseContent();
+
+    // Non-shortened contexts (threads, etc.): render everything as-is.
+    if (!props.shorten) {
+      for (let i = 0; i < tokens.length; i++) {
+        parseToken(tokens[i]);
+      }
+      finalizeContent();
+      return;
+    }
+
+    let words = 0;
+    let i = 0;
+    let tooLong = false;
+
+    // Phase 1 — render inline words up to the limit. Embeds (images, videos,
+    // mentions, ...) pass through WITHOUT counting towards the limit.
+    for (; i < tokens.length; i++) {
+      const token = tokens[i];
+      const significant = token !== '__SP__' && token !== '__LB__' && token.trim().length > 0;
+      const counts = significant && !isEmbedToken(token);
+
+      if (counts) {
+        if (words >= shortNoteWords) {
+          // stop before adding the over-limit word; the rest is hidden
+          tooLong = true;
+          break;
+        }
+        words++;
+      }
+
+      parseToken(token);
+    }
+
+    // Phase 2 — append the first embed that follows the cut-off as a teaser.
+    if (tooLong) {
+      // find the first embed after the text cut
+      for (; i < tokens.length; i++) {
+        if (isEmbedToken(tokens[i])) break;
+      }
+
+      if (i < tokens.length) {
+        const firstIsImage = !props.ignoreMedia && isImage(tokens[i]);
+        parseToken(tokens[i]);
+        i++;
+
+        // Consecutive images merge into a single mosaic block that takes up the
+        // same vertical space as one image, so include the whole run.
+        if (firstIsImage) {
+          for (; i < tokens.length; i++) {
+            const t = tokens[i];
+            if (t === '__SP__' || t === '__LB__') { parseToken(t); continue; }
+            if (isImage(t)) { parseToken(t); continue; }
+            break; // first non-image content ends the mosaic
+          }
+        }
+      }
+    }
+
+    setIsTooLong(tooLong);
+    finalizeContent();
   };
 
   const renderLinebreak = (item: NoteContent) => {
@@ -2088,7 +2162,7 @@ const ParsedNote: Component<{
       <For each={content}>
         {(item, index) => renderContent(item, index(), content.length)}
       </For>
-      <Show when={isNoteTooLong() || noteContent().length < (props.note.content?.length || 0)}>
+      <Show when={isTooLong()}>
         <span class={styles.more}>
           ... <span class="linkish">{intl.formatMessage(actions.seeMore)}</span>
         </span>
