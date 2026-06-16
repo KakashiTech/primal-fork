@@ -1,5 +1,5 @@
 import { useIntl } from '@cookbook/solid-intl';
-import { A } from '@solidjs/router';
+import { A, useNavigate } from '@solidjs/router';
 import { Component, createEffect, createSignal, Match, Show, Switch } from 'solid-js';
 import { Kind, mentionedNotifTypes, NotificationType, notificationTypeNoteProps, notificationTypeUserProps } from '../../constants';
 import { trimVerification } from '../../lib/profile';
@@ -64,6 +64,7 @@ import { useSettingsContext } from '../../contexts/SettingsContext';
 import { StreamingData } from '../../lib/streaming';
 import UserPoll from '../UserPoll/UserPoll';
 import ZapPoll from '../UserPoll/ZapPoll';
+import { useThreadContext } from '../../contexts/ThreadContext';
 
 const typeIcons: Record<string, string> = {
   [NotificationType.NEW_USER_FOLLOWED_YOU]: userFollow,
@@ -170,6 +171,8 @@ const NotificationItemOld: Component<NotificationItemProps> = (props) => {
   const intl = useIntl();
   const app = useAppContext();
   const settings = useSettingsContext();
+  const navigate = useNavigate();
+  const threadContext = useThreadContext();
 
   const [typeIcon, setTypeIcon] = createSignal<string>('');
   const [reactionIcon, setReactionIcon] = createSignal<string>('');
@@ -321,10 +324,28 @@ const NotificationItemOld: Component<NotificationItemProps> = (props) => {
     return props.streams.find(s => identifier === s.id);
   }
 
+  // Navigate to the note's thread when an empty/non-interactive area of the
+  // notification (icon column, header, timestamp) is clicked. Clicks that land
+  // on a link or button (e.g. an avatar) are ignored so they keep their own
+  // behaviour.
+  const navToThread = (e: MouseEvent) => {
+    const n = note();
+    if (!n) return;
+
+    if ((e.target as HTMLElement)?.closest('a, button')) return;
+
+    navigate(`/e/${n.noteIdShort}`);
+    threadContext?.actions.setPrimaryNote(n);
+  };
+
 
   return (
     <div id={props.id} class={styles.notifItem} data-notif={props.notification.id}>
-      <div class={`${styles.notifType} ${[NotificationType.YOUR_POST_WAS_REPLIED_TO, NotificationType.REPLY_TO_REPLY].includes(props.notification.type) ? styles.replyAvatar : ''}`}>
+      <div
+        class={`${styles.notifType} ${[NotificationType.YOUR_POST_WAS_REPLIED_TO, NotificationType.REPLY_TO_REPLY].includes(props.notification.type) ? styles.replyAvatar : ''}`}
+        classList={{ [styles.clickable]: !!note() }}
+        onClick={navToThread}
+      >
         <Switch fallback={
           <img src={typeIcon()} alt="notification icon" />
         }>
@@ -359,10 +380,18 @@ const NotificationItemOld: Component<NotificationItemProps> = (props) => {
         </Show>
       </div>
       <div class={styles.notifContent}>
-        <div class={styles.time}>
+        <div
+          class={styles.time}
+          classList={{ [styles.clickable]: !!note() }}
+          onClick={navToThread}
+        >
           {time()}
         </div>
-        <div class={styles.notifHeader}>
+        <div
+          class={styles.notifHeader}
+          classList={{ [styles.clickable]: !!note() }}
+          onClick={navToThread}
+        >
           <Show
             when={![NotificationType.YOUR_POST_WAS_REPLIED_TO, NotificationType.REPLY_TO_REPLY].includes(props.notification.type)}
           >

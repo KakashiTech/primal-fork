@@ -44,7 +44,8 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      width: 80%;
+      width: 100%;
+      padding-right: 52px;
       min-height: 36px;
       flex-wrap: wrap;
 
@@ -86,6 +87,10 @@
       color: var(--text-tertiary);
     }
   }
+}
+
+.clickable {
+  cursor: pointer;
 }
 
 .firstUserName {
