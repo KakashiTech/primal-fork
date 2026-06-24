@@ -1356,6 +1356,8 @@ const ParsedNote: Component<{
 
   const renderComunityMention = (item: NoteContent, index?: number) => {
 
+    if (props.veryShort) return <></>;
+
     return <For each={item.tokens}>
       {(token) => {
         if (isNoteTooLong()) return;
@@ -2071,7 +2073,7 @@ const ParsedNote: Component<{
 
         let embeded = <></>;
 
-        if (props.noLinks === 'text') {
+        if (props.veryShort || props.noLinks === 'text') {
           embeded = <span>#{term}</span>;
         } else if (props.noLinks === 'links') {
           embeded = <span class="linkish">#{term}</span>;
@@ -2107,6 +2109,8 @@ const ParsedNote: Component<{
   };
 
   const renderLnbc = (item: NoteContent) => {
+    if (props.veryShort) return <></>;
+
     return <For each={item.tokens}>
       {(token) => {
         if (isNoteTooLong()) return;
