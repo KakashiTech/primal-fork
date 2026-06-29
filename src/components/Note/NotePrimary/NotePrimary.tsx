@@ -1,15 +1,19 @@
-import { Component, createSignal, Show } from 'solid-js';
+import { Component, createSignal, onCleanup, onMount, Show } from 'solid-js';
+import { useIntl } from '@cookbook/solid-intl';
 import { hookForDev } from '../../../lib/devTools';
 import { PrimalNote } from '../../../types/primal';
 import ParsedNote from '../../ParsedNote/ParsedNote';
 import NoteFooter from '../NoteFooter/NoteFooter';
 import NoteHeader from '../NoteHeader/NoteHeader';
-import { translateText } from '../../../lib/translate';
+import { fetchTranslation, prefetchTranslation } from '../../../lib/translate';
+import { note as t } from '../../../translations';
 
 import styles from './NotePrimary.module.scss';
 
 
 const NotePrimary: Component<{ note: PrimalNote, id?: string }> = (props) => {
+
+  const intl = useIntl();
 
   const [translation, setTranslation] = createSignal<string | null>(null);
   const [translating, setTranslating] = createSignal(false);
@@ -19,6 +23,22 @@ const NotePrimary: Component<{ note: PrimalNote, id?: string }> = (props) => {
     return '';
   };
 
+  const targetLang = () => navigator.language.split('-')[0] || 'en';
+
+  let cancelPrefetch: (() => void) | undefined;
+
+  onMount(() => {
+    cancelPrefetch = prefetchTranslation(
+      props.note.post.id,
+      noteContent(),
+      targetLang(),
+    );
+  });
+
+  onCleanup(() => {
+    cancelPrefetch?.();
+  });
+
   const handleTranslate = async () => {
     if (translation()) {
       setTranslation(null);
@@ -26,8 +46,7 @@ const NotePrimary: Component<{ note: PrimalNote, id?: string }> = (props) => {
     }
 
     setTranslating(true);
-    const targetLang = navigator.language.split('-')[0] || 'en';
-    const result = await translateText(noteContent(), targetLang);
+    const result = await fetchTranslation(noteContent(), targetLang(), props.note.post.id);
     setTranslation(result);
     setTranslating(false);
   };
@@ -59,7 +78,12 @@ const NotePrimary: Component<{ note: PrimalNote, id?: string }> = (props) => {
             onClick={handleTranslate}
             disabled={translating()}
           >
-            {translating() ? 'Translating...' : translation() ? 'Show original' : 'Translate'}
+            {translating()
+              ? intl.formatMessage(t.translating)
+              : translation()
+                ? intl.formatMessage(t.showOriginal)
+                : intl.formatMessage(t.translate)
+            }
           </button>
         </Show>
 
